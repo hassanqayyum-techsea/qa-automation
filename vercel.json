@@ -15,7 +15,6 @@
     },
     "live-runner": {
       "root": "spikes/live-runner",
-      "runtime": "nodejs24.x",
       "entrypoint": "server.mjs",
       "installCommand": "npm ci && npx playwright install chromium"
     }
