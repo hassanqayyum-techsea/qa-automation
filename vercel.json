@@ -1,0 +1,31 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "app": {
+      "root": ".",
+      "framework": "nextjs",
+      "functions": {
+        "app/api/live/route.ts": {
+          "maxDuration": 300
+        },
+        "app/api/runs/**/route.ts": {
+          "maxDuration": 300
+        }
+      }
+    },
+    "live-runner": {
+      "root": "spikes/live-runner",
+      "runtime": "nodejs24.x",
+      "entrypoint": "server.mjs",
+      "installCommand": "npm ci && npx playwright install chromium"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "app"
+      }
+    }
+  ]
+}
