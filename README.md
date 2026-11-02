@@ -13,7 +13,8 @@ Read-only GitHub analytics with role-based access, plus live browser tests for y
 Needs Node 24, MongoDB and Redis running locally (`brew services start mongodb-community redis`).
 
 ```bash
-npm install                    # .npmrc points the Odyssey UI scope at GitHub Packages; your ~/.npmrc needs a read:packages token
+export NPM_TOKEN=<GitHub token with read:packages>   # .npmrc reads it for the private Odyssey UI package
+npm install
 npx playwright install chromium
 cp .env.example .env.local     # then fill SESSION_SECRET and ENCRYPTION_KEY (commands are in the file)
 npm run dev                    # web app on http://localhost:3000

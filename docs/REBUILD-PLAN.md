@@ -59,9 +59,10 @@ runs on the server and is streamed instead).
 
 Exact `package.json`, `next.config.ts`, `tsconfig.json`, `.npmrc`, `.env.example` are in Appendix A.
 
-**Odyssey UI access.** The project `.npmrc` contains only the registry line
-`@your-job-search-genius:registry=https://npm.pkg.github.com`. The developer's `~/.npmrc` must hold
-`//npm.pkg.github.com/:_authToken=<GitHub token with read:packages>`. Never commit a token. If the Odyssey
+**Odyssey UI access.** The project `.npmrc` points the `@your-job-search-genius` scope at GitHub Packages
+and reads the token from the environment: `//npm.pkg.github.com/:_authToken=${NPM_TOKEN}`. Set `NPM_TOKEN`
+(a GitHub token with `read:packages`) in your shell locally and as a Vercel environment variable. Never commit
+a token. A project-level `_authToken` line overrides `~/.npmrc`, so `NPM_TOKEN` must be exported locally too. If the Odyssey
 MCP server ("yjsg-mcp") is available, follow its workflow for every UI change: `get_rules` →
 `plan_ui_task` → discover components (`list_components` / `search_components` / `get_component`) → build
 → `validate_jsx` → typecheck → completion record (`docs/ui-completion-record.md`).
@@ -1076,6 +1077,7 @@ export default eslintConfig;
 
 ````
 @your-job-search-genius:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=${NPM_TOKEN}
 ````
 
 ### `.env.example`
