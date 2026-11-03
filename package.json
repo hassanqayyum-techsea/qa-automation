@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "worker": "tsx --env-file=.env.local worker/index.ts",
+    "worker:prod": "tsx worker/index.ts",
     "test": "node --test lib/*.test.ts",
     "typecheck": "tsc --noEmit",
     "e2e": "node e2e/smoke.mjs"
