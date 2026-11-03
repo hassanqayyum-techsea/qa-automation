@@ -1,4 +1,7 @@
-# Odyssey UI completion record: Repo Pulse console
+# Odyssey UI completion record: legacy Repo Pulse console
+
+> Historical record from before the product was narrowed to QA Automation. GitHub analytics,
+> repository, and webhook screens referenced below are no longer part of the application.
 
 Built 2 Nov 2026 against `@your-job-search-genius/odyssey-ui` 2.4.1 (rules v4.2.0). Rule IDs are grouped where they share the same evidence.
 Results: **Pass**, **Fail**, **N/A** (with reason), **Not verified** (with what's missing).

@@ -39,7 +39,7 @@ export default async function TestPage({ params }: PageProps<"/apps/[appId]/test
           { id: "test", label: test.name },
         ]}
       />
-      <title>{`${test.name} · Repo Pulse`}</title>
+      <title>{`${test.name} · QA Automation`}</title>
       <PageHeader
         title={test.name}
         description={

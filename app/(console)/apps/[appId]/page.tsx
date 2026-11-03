@@ -45,7 +45,7 @@ export default async function AppPage({ params }: PageProps<"/apps/[appId]">) {
   return (
     <div className="flex flex-col gap-8 px-4 py-8 md:px-8">
       <Breadcrumbs items={[{ id: "tests", label: "Tests", href: "/apps" }, { id: "app", label: app.name }]} />
-      <title>{`${app.name} · Repo Pulse`}</title>
+      <title>{`${app.name} · QA Automation`}</title>
       <PageHeader
         title={app.name}
         description={

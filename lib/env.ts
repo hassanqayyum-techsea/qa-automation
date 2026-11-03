@@ -8,6 +8,5 @@ export const env = z
     ENCRYPTION_KEY: z
       .string()
       .refine((v) => Buffer.from(v, "base64").length === 32, "ENCRYPTION_KEY must be 32 bytes, base64-encoded"),
-    APP_URL: z.url().default("http://localhost:3000"),
   })
   .parse(process.env);

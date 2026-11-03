@@ -22,7 +22,7 @@ export default function LoginPage() {
 }
 
 async function LoginOrSetup() {
-  if (await getUser()) redirect("/");
+  if (await getUser()) redirect("/apps");
   await dbReady();
   const firstRun = (await col.users.countDocuments({}, { limit: 1 })) === 0;
   return firstRun ? (
@@ -36,7 +36,7 @@ async function LoginOrSetup() {
   ) : (
     <>
       <header className="flex flex-col gap-2">
-        <Heading level={1} size={3}>Sign in to Repo Pulse</Heading>
+        <Heading level={1} size={3}>Sign in to QA Automation</Heading>
         <Body1>Accounts are created by your Owner. Ask them if you need access or a password reset.</Body1>
       </header>
       <LoginForm />

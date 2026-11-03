@@ -7,6 +7,6 @@ export default function proxy(req: NextRequest) {
 }
 
 export const config = {
-  // Public: login, GitHub webhooks (HMAC-verified), Next internals and static files.
-  matcher: ["/((?!login|api/webhooks|_next/|favicon.ico).*)"],
+  // Public: login, Next internals and static files.
+  matcher: ["/((?!login|_next/|favicon.ico).*)"],
 };

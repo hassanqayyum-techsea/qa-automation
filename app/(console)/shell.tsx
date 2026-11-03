@@ -5,7 +5,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { SidebarLayout } from "@your-job-search-genius/odyssey-ui/components/application/sidebar/sidebar";
 import type { SidebarNavItem } from "@your-job-search-genius/odyssey-ui/components/application/sidebar/sidebar";
 import {
-  ClipboardCheck, GitBranch01, Home02, LogOut01, Settings01, Users01, Zap,
+  ClipboardCheck, LogOut01, Settings01,
 } from "@your-job-search-genius/odyssey-ui/components/foundations/icons";
 import type { Permission } from "~/lib/permissions";
 import { logout } from "~/app/login/actions";
@@ -13,11 +13,7 @@ import { logout } from "~/app/login/actions";
 type NavDef = Omit<SidebarNavItem, "items"> & { perm?: Permission; items?: { label: string; href: string; perm: Permission }[] };
 
 const NAV: NavDef[] = [
-  { label: "Dashboard", href: "/", icon: Home02, perm: "analytics:view" },
-  { label: "Contributors", href: "/contributors", icon: Users01, perm: "analytics:view" },
-  { label: "Repositories", href: "/repos", icon: GitBranch01, perm: "analytics:view" },
   { label: "Tests", href: "/apps", icon: ClipboardCheck, perm: "tests:view", matchHrefs: ["/runs"] },
-  { label: "Webhooks", href: "/hooks", icon: Zap, perm: "hooks:view" },
   {
     label: "Settings",
     icon: Settings01,
@@ -50,7 +46,7 @@ export function Shell({
 
   return (
     <SidebarLayout
-      brand={{ name: "Repo Pulse" }}
+      brand={{ name: "QA Automation" }}
       activeUrl={search ? `${pathname}?${search}` : pathname}
       items={items}
       account={{
