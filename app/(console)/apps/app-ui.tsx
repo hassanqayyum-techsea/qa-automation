@@ -26,6 +26,22 @@ export type RunState = keyof typeof RUN;
 export const EnvBadge = ({ env }: { env: Env }) => <Badge size="sm" color={ENV[env].color}>{ENV[env].label}</Badge>;
 export const RunBadge = ({ status }: { status: RunState }) => <Badge size="sm" color={RUN[status].color}>{RUN[status].label}</Badge>;
 
+/** Step results. The text carries the meaning; colour only reinforces it. */
+const STEP = {
+  pending: { color: "gray", label: "Waiting" },
+  running: { color: "blue", label: "Running" },
+  passed: { color: "success", label: "Passed" },
+  failed: { color: "error", label: "Failed" },
+  skipped: { color: "warning", label: "Skipped" },
+} as const;
+/** On a finished run a step can't still be running or waiting: it was interrupted, or never ran. */
+const STEP_FINAL = { ...STEP, pending: { color: "gray", label: "Not run" }, running: { color: "warning", label: "Interrupted" } } as const;
+export type StepState = keyof typeof STEP;
+export const StepBadge = ({ status, final = false }: { status: StepState; final?: boolean }) => {
+  const s = (final ? STEP_FINAL : STEP)[status];
+  return <Badge size="sm" color={s.color}>{s.label}</Badge>;
+};
+
 const ENV_ITEMS = (Object.keys(ENV) as Env[]).map((id) => ({ id, label: ENV[id].label }));
 
 /** Fields shared by "Add app" and "Edit app". The saved password is never sent to the browser. */

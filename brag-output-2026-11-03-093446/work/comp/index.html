@@ -1,0 +1,178 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Repo Pulse Tests</title>
+<script src="rec.js"></script>
+<script src="edl.js"></script>
+<style>
+@font-face { font-family: Geist; src: url(geist.woff2) format("woff2"); font-weight: 100 900; }
+:root { --navy: #10244f; --slate: #475467; --purple: #563bdb; --lav: #f4f3ff; }
+* { box-sizing: border-box; margin: 0; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; background: #fff; }
+body { font-family: Geist, system-ui, sans-serif; color: var(--navy); -webkit-font-smoothing: antialiased; }
+.layer { position: absolute; inset: 0; overflow: hidden; }
+.layer img { position: absolute; left: 0; top: 0; width: 3200px; height: 1800px; transform-origin: 0 0; }
+.blur { position: absolute; backdrop-filter: blur(9px); background: rgba(255,255,255,.2); border-radius: 8px; }
+#cursor { position: absolute; left: 0; top: 0; transform-origin: 3px 3px; filter: drop-shadow(0 3px 5px rgba(0,0,0,.3)); }
+.ripple { position: absolute; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%; background: rgba(86,59,219,.22); border: 3px solid rgba(86,59,219,.75); }
+.cap { position: absolute; max-width: 780px; background: rgba(255,255,255,.97); border-radius: 22px; padding: 26px 34px 28px; box-shadow: 0 2px 4px rgba(16,24,40,.06), 0 24px 60px -10px rgba(40,30,110,.35); border: 1px solid #ebe9fe; }
+.cap .k { font-size: 19px; font-weight: 650; letter-spacing: .12em; text-transform: uppercase; color: var(--purple); margin-bottom: 10px; }
+.cap .t { font-size: 42px; font-weight: 680; letter-spacing: -0.025em; line-height: 1.1; }
+.cap .s { font-size: 25px; font-weight: 450; color: var(--slate); line-height: 1.35; margin-top: 10px; }
+#ff { position: absolute; left: 50%; transform: translateX(-50%); top: 36px; padding: 12px 22px; border-radius: 999px; background: var(--navy); color: #fff; font-size: 24px; font-weight: 600; letter-spacing: .02em; }
+.overlay { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; padding-left: 150px; }
+.overlay .bg { position: absolute; inset: 0; overflow: hidden; }
+.overlay .bg img { position: absolute; left: -96px; top: -54px; width: 2112px; height: 1188px; filter: blur(16px) saturate(1.1); }
+.overlay .veil { position: absolute; inset: 0; background: linear-gradient(100deg, rgba(250,249,255,.97) 0%, rgba(246,244,255,.9) 55%, rgba(238,234,255,.72) 100%); }
+.overlay .in { position: relative; }
+.kick { font-size: 24px; font-weight: 650; letter-spacing: .16em; text-transform: uppercase; color: var(--purple); }
+.h1 { font-size: 92px; font-weight: 680; letter-spacing: -0.035em; line-height: 1.04; }
+.sub { font-size: 32px; color: var(--slate); font-weight: 450; }
+.chips { display: flex; gap: 14px; flex-wrap: wrap; max-width: 1640px; }
+.chip { padding: 12px 22px; border-radius: 999px; background: #fff; border: 1.5px solid #d9d6fe; color: var(--purple); font-size: 26px; font-weight: 600; }
+.line { will-change: transform, opacity; }
+</style>
+</head>
+<body>
+<div class="layer" id="A"><img id="imgA"></div>
+<div class="layer" id="B"><img id="imgB"></div>
+<div id="blurs"></div>
+<svg id="cursor" width="26" height="32" viewBox="0 0 26 32"><path d="M2.5 2.5 L2.5 25 L8.4 19.6 L12.6 29.2 L16.6 27.5 L12.5 18 L20.4 18 Z" fill="#111827" stroke="#fff" stroke-width="2" stroke-linejoin="round"/></svg>
+<div id="ripples"></div>
+<div id="caps"></div>
+<div id="ff">▶▶ fast-forward</div>
+<div class="overlay" id="hook">
+  <div class="bg"><img id="hookImg"></div><div class="veil"></div>
+  <div class="in">
+    <div class="kick line" style="margin-bottom:30px">Repo Pulse · Tests tab</div>
+    <div class="h1 line">Write a test in plain English.</div>
+    <div class="h1 line" style="color:var(--purple)">Watch it pass on a real phone.</div>
+    <div class="sub line" style="margin-top:34px">The full walkthrough, recorded in the real app.</div>
+  </div>
+</div>
+<div class="overlay" id="outro">
+  <div class="bg"><img id="outroImg"></div><div class="veil"></div>
+  <div class="in">
+    <div class="kick line" style="margin-bottom:30px">Repo Pulse · Tests</div>
+    <div class="h1 line">Markdown steps. Real devices.</div>
+    <div class="h1 line" style="color:var(--purple)">Live runs you can watch.</div>
+    <div class="chips line" style="margin-top:44px">
+      <span class="chip">AI writes the steps</span><span class="chip">Start signed in</span><span class="chip">Any device</span>
+      <span class="chip">Live phone screen</span><span class="chip">Versions</span><span class="chip">Screenshot per step</span>
+    </div>
+  </div>
+</div>
+<script>
+const E = window.EDL, R = E.R, W = 1920;
+const $ = (id) => document.getElementById(id);
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const ease = (x) => 1 - Math.pow(1 - clamp(x), 3);
+const fileAt = (s) => {
+  let lo = 0, hi = R.frames.length - 1;
+  while (lo < hi) { const m = (lo + hi + 1) >> 1; if (R.frames[m] <= s) lo = m; else hi = m - 1; }
+  return `rec/f-${String(lo).padStart(5, "0")}.jpg`;
+};
+const place = (img, cam) => {
+  const k = W / cam[2];
+  img.style.transform = `translate(${-cam[0] * k}px, ${-cam[1] * k}px) scale(${k / 2})`;
+};
+const toScreen = (cam, x, y) => { const k = W / cam[2]; return [(x - cam[0]) * k, (y - cam[1]) * k, k]; };
+const mouseAt = (s) => {
+  const M = R.mouse;
+  if (!M.length || s < M[0][0]) return [1100, 700];
+  let lo = 0, hi = M.length - 1;
+  while (lo < hi) { const m = (lo + hi + 1) >> 1; if (M[m][0] <= s) lo = m; else hi = m - 1; }
+  const a = M[lo], b = M[lo + 1];
+  if (!b || b[0] - a[0] > 0.1) return [a[1], a[2]];
+  const u = (s - a[0]) / (b[0] - a[0]);
+  return [a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u];
+};
+
+// captions
+const capEls = E.captions.map((c) => {
+  const el = document.createElement("div");
+  el.className = "cap";
+  el.innerHTML = `<div class="k">${c.k}</div><div class="t">${c.t}</div>${c.s ? `<div class="s">${c.s}</div>` : ""}`;
+  const m = 56;
+  Object.assign(el.style, c.pos === "tl" ? { left: m + "px", top: m + "px" } : c.pos === "tr" ? { right: m + "px", top: m + "px" } : c.pos === "br" ? { right: m + "px", bottom: m + "px" } : { left: m + "px", bottom: m + "px" });
+  $("caps").appendChild(el);
+  return el;
+});
+const blurEls = E.BLUR.map(() => $("blurs").appendChild(Object.assign(document.createElement("div"), { className: "blur" })));
+const ripEls = E.cues.clicks.map(() => $("ripples").appendChild(Object.assign(document.createElement("div"), { className: "ripple" })));
+const lines = (id) => [...$(id).querySelectorAll(".line")];
+
+const loaded = (img, src) => {
+  if (img.getAttribute("src") === src) return Promise.resolve();
+  img.src = src;
+  return img.decode().catch(() => {});
+};
+window.ready = Promise.all([loaded($("hookImg"), fileAt(107.7)), loaded($("outroImg"), fileAt(166.4)), document.fonts.ready]);
+
+window.seek = async (t) => {
+  const { si, s, piece } = E.srcAt(t);
+  const seg = E.SEG[si];
+  const cam = E.camAt(Math.max(t, E.HOOK));
+  // Main layer.
+  const jobs = [loaded($("imgA"), fileAt(s))];
+  place($("imgA"), cam);
+  // Cross-fade out of the previous segment at cuts.
+  const xk = seg.cut ? (t - seg.o0) / E.XF : 1;
+  if (xk < 1 && t >= seg.o0) {
+    const prev = E.SEG[si - 1];
+    jobs.push(loaded($("imgB"), fileAt(prev.src[1])));
+    place($("imgB"), E.camAt(prev.o1 - 0.001));
+    $("B").style.opacity = 1 - ease(xk);
+  } else $("B").style.opacity = 0;
+  await Promise.all(jobs);
+
+  // Privacy blur.
+  E.BLUR.forEach((b, i) => {
+    const on = s >= b.src[0] && s <= b.src[1] && t >= E.HOOK;
+    const [x, y, k] = toScreen(cam, b.rect[0], b.rect[1]);
+    Object.assign(blurEls[i].style, { display: on ? "block" : "none", left: x + "px", top: y + "px", width: b.rect[2] * k + "px", height: b.rect[3] * k + "px" });
+  });
+
+  // Cursor + click ripples.
+  const [mx, my] = mouseAt(s);
+  const [cx, cy, k] = toScreen(cam, mx, my);
+  const cs = 1.05 * Math.pow(k / 1.2, 0.55);
+  $("cursor").style.transform = `translate(${cx - 3}px, ${cy - 3}px) scale(${cs})`;
+  $("cursor").style.opacity = t >= E.HOOK && t < E.END ? 1 : 0;
+  E.cues.clicks.forEach((c, i) => {
+    const u = (t - c) / 0.5, el = ripEls[i];
+    if (u < 0 || u > 1) return void (el.style.display = "none");
+    const [rx, ry] = toScreen(E.camAt(c), ...mouseAt(E.srcAt(c).s));
+    Object.assign(el.style, { display: "block", left: rx + "px", top: ry + "px", opacity: 1 - u, transform: `scale(${0.35 + 1.1 * ease(u)})` });
+  });
+
+  // Captions.
+  E.captions.forEach((c, i) => {
+    const a = ease((t - c.o0) / 0.45), b = 1 - ease((t - (c.o1 - 0.3)) / 0.3);
+    const v = t >= c.o0 && t <= c.o1 ? Math.min(a, b) : 0;
+    const dy = c.pos[0] === "t" ? -1 : 1;
+    capEls[i].style.opacity = v;
+    capEls[i].style.transform = `translateY(${dy * (1 - a) * 24}px)`;
+  });
+  // Fast-forward badge.
+  const ffOn = piece && piece.ff;
+  $("ff").textContent = piece && piece.ff ? `▶▶ ${piece.rate.toFixed(1).replace(/\.0$/, "")}× speed` : $("ff").textContent;
+  $("ff").style.opacity = ffOn ? 1 : 0;
+
+  // Hook.
+  const h = t < E.HOOK + 0.5 ? 1 - ease((t - (E.HOOK - 0.15)) / 0.5) : 0;
+  $("hook").style.opacity = h;
+  $("hook").style.display = h > 0 ? "flex" : "none";
+  lines("hook").forEach((el, i) => { const u = ease((t - 0.15 - i * 0.22) / 0.6); el.style.opacity = u; el.style.transform = `translateY(${(1 - u) * 30}px)`; });
+  $("hookImg").style.transform = `scale(${1 + t * 0.012})`;
+  // Outro.
+  const ot = t - E.END;
+  const oo = ease(ot / 0.6);
+  $("outro").style.opacity = ot > 0 ? oo : 0;
+  $("outro").style.display = ot > 0 ? "flex" : "none";
+  lines("outro").forEach((el, i) => { const u = ease((ot - 0.3 - i * 0.2) / 0.6); el.style.opacity = u; el.style.transform = `translateY(${(1 - u) * 30}px)`; });
+};
+</script>
+</body>
+</html>

@@ -25,7 +25,8 @@ Rules:
 - Keep the description's order exactly. A wait mentioned between two actions (e.g. "sign in, wait 2s, then enter the code") becomes "wait 2s" between those two steps, never at the end.
 - Read the description as a sequence even when it's written as notes or a list: credentials → sign in; then each "and …" in order.
 - If the description says how to sign in (email, password, OTP, the sign-in screen), write those steps out and do not add a session line.
-- Keep the current session line if it still applies; leaving it out removes the session.
+- Keep the current session line if it still applies, written exactly as "session: <test name>"; leaving it out removes the session.
+- While a session is kept, the test starts signed in: remove any sign-in steps (the /login visit, email, password, code) from the current test.
 - Add "session: <exact test name>" only when the description assumes an already signed-in user and doesn't describe signing in, and one of the listed tests is a sign-in flow.
 - Write "device: <name>" only when the description asks for a device (a name like iPhone 15, Pixel 7, iPad Pro 11, Desktop Chrome, or a size like 1366x768).
 - Use {{email}} and {{password}} for the saved test account. Never write a real password into the test.
@@ -68,7 +69,10 @@ export async function generateTest(input: {
       ? `Other tests for this app (real labels; values hidden):\n\n${input.examples.map(redact).join("\n\n---\n\n")}`
       : "There are no other tests for this app yet, so guess labels from common wording.",
     input.tests.length ? `Tests that can be used as "session:": ${input.tests.map((t) => `"${t}"`).join(", ")}` : "",
-    `Current settings: device ${input.device}; ${input.session ? `session "${input.session}"` : "no session"}.`,
+    `Current device: ${input.device}. Don't write a device line unless the request asks for another device.`,
+    input.session
+      ? `Current session line (the test starts already signed in):\nsession: ${input.session}`
+      : "Current session: none (the test starts signed out).",
     `Current test:\n\n${input.current}`,
     `Request:\n${input.prompt}`,
   ]

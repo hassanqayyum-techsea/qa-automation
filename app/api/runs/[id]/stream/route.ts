@@ -12,10 +12,16 @@ export async function GET(req: Request, { params }: RouteContext<"/api/runs/[id]
   const _id = oid(id);
   if (!_id) return new Response("Unknown run.", { status: 404 });
 
-  return sseFromChannel(req, runChannel(id), async () => {
-    const run = await col.runs.findOne({ _id }, { projection: { "steps.screenshot": 0 } });
-    return run
-      ? { t: "snapshot", status: run.status, steps: run.steps, values: run.values, error: run.error ?? null }
-      : { t: "status", status: "failed", error: "This run was deleted." };
-  });
+  return sseFromChannel(
+    req,
+    runChannel(id),
+    async () => {
+      const run = await col.runs.findOne({ _id }, { projection: { "steps.screenshot": 0 } });
+      return run
+        ? { t: "snapshot", status: run.status, steps: run.steps, values: run.values, error: run.error ?? null }
+        : { t: "status", status: "failed", error: "This run was deleted." };
+    },
+    // The run is over once a snapshot or status says passed/failed/stopped; frames never match this cheap check.
+    (raw) => /^\{"t":"(status|snapshot)","status":"(passed|failed|stopped)"/.test(raw),
+  );
 }

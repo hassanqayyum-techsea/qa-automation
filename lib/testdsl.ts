@@ -37,14 +37,16 @@ export function resolveDevice(want: string, names: readonly string[]) {
  * Device and session are settings, not part of the Markdown. Older tests (and some AI answers) carry them as
  * `device: …` / `session: …` lines; this pulls those lines out so they can be moved into the settings.
  */
+const unquote = (v: string) => v.trim().replace(/^"(.*)"$/, "$1").trim();
+
 export function splitHeader(markdown: string): { body: string; device: string | null; session: string | null } {
   const res = { body: "", device: null as string | null, session: null as string | null };
   const body: string[] = [];
   for (const l of markdown.split(/\r?\n/)) {
     const m = l.trim().match(/^(device|session):\s*(.+)$/i);
     if (!m) body.push(l);
-    else if (m[1].toLowerCase() === "device") res.device = m[2].trim();
-    else res.session = m[2].trim();
+    else if (m[1].toLowerCase() === "device") res.device = unquote(m[2]);
+    else res.session = unquote(m[2]);
   }
   res.body = body.join("\n");
   return res;
@@ -74,7 +76,7 @@ export const STEP_HELP = [
   'click "Sign in"  (button, link, label, exact text, or a CSS selector like "#submit")',
   'tap "Menu"  (same as click, as a finger tap)',
   'fill "Email address" with "{{email}}"  (label, placeholder, or a CSS selector like "#email")',
-  'type "000000"  (types into whatever is focused, e.g. one-box-per-digit OTP fields)',
+  'type "000000"  (types into the focused field, waiting for one to get focus; works with one-box-per-digit OTP fields)',
   'press "Enter"',
   'wait for "OTP Code"  (until a field, button or text is on screen, up to 30s)',
   "wait for url /dashboard",
@@ -135,6 +137,20 @@ export function parseTest(markdown: string): ParseResult {
 export const fillVars = (s: string, vars: Record<string, string>) =>
   s.replace(/\{\{(\w+)\}\}/g, (_, k: string) => vars[k] ?? `{{${k}}}`);
 
+/**
+ * A step target is CSS when it starts with #, . or [, or with a tag name followed by one of them
+ * (input[name='email'], button.primary, div#app). Anything else is a label, placeholder or text.
+ * ponytail: a label that itself looks like "word.word" or "word#x" is read as CSS; quote-free labels like that are rare.
+ */
+export const isCss = (t: string) => /^(?:[#.[]|[a-z][a-z0-9-]*[[#.])/i.test(t);
+
+/**
+ * "wait for url /dashboard": a path matches the URL's path only, so a redirect like /login?next=/dashboard
+ * doesn't count. Add "?" to the step to match the query too; anything not starting with "/" matches the full URL.
+ */
+export const urlMatches = (u: URL, want: string) =>
+  want.startsWith("/") ? (want.includes("?") ? u.pathname + u.search : u.pathname).includes(want) : u.href.includes(want);
+
 /** Runs one step. Returns a short note for the results list (e.g. "jobs = 24"). */
 export async function runStep(
   page: Page,
@@ -142,7 +158,6 @@ export async function runStep(
   ctx: { baseUrl: string; vars: Record<string, string>; values: Record<string, number>; hasTouch: boolean },
 ): Promise<string> {
   const v = (s: string) => fillVars(s, ctx.vars);
-  const isCss = (t: string) => /^[#.[]/.test(t);
   const find = (t: string) =>
     isCss(t)
       ? page.locator(t).first()
@@ -154,11 +169,15 @@ export async function runStep(
           .first();
   // Label, placeholder, or CSS. Also follows a visible <label for="…"> directly, because some pages
   // override the label with a broken aria-labelledby and the field ends up with no accessible name.
+  // Last resort: the first field after a label with that text, for labels whose `for` points at the
+  // wrong id (e.g. for="email" on an input with id="field-:r1:"), which leaves the field unlabelled.
   const field = async (t: string) => {
     if (isCss(t)) return page.locator(t).first();
+    const label = page.locator("label", { hasText: t }).first();
     let loc = page.getByLabel(t).or(page.getByPlaceholder(t));
-    const forId = await page.locator("label", { hasText: t }).first().getAttribute("for", { timeout: 2000 }).catch(() => null);
+    const forId = await label.getAttribute("for", { timeout: 2000 }).catch(() => null);
     if (forId) loc = loc.or(page.locator(`[id="${forId.replace(/"/g, '\\"')}"]`));
+    loc = loc.or(label.locator("xpath=following::*[self::input or self::textarea or self::select][not(@type='hidden')][1]"));
     return loc.first();
   };
   switch (step.kind) {
@@ -175,9 +194,28 @@ export async function runStep(
     case "fill":
       await (await field(v(step.target))).fill(v(step.value));
       return "";
-    case "type":
+    case "type": {
+      // Typing only makes sense into a field. Wait for one to have focus (an OTP screen often focuses its first
+      // box a moment after it shows); if none does, fail rather than "pass" by typing into a button or the page.
+      const focusedField = () => {
+        const e = document.activeElement as HTMLElement | null;
+        if (!e) return false;
+        if (e.isContentEditable || e.tagName === "TEXTAREA" || e.tagName === "IFRAME") return true; // iframes: can't look inside
+        return e.tagName === "INPUT" && !["button", "submit", "reset", "checkbox", "radio", "hidden", "image", "file", "range", "color"].includes((e as HTMLInputElement).type);
+      };
+      const ready = await page.waitForFunction(focusedField).then(() => true, () => false);
+      if (!ready) {
+        const what = await page.evaluate(() => {
+          const e = document.activeElement as HTMLElement | null;
+          if (!e || e === document.body) return "nothing";
+          const text = (e.innerText || e.getAttribute("aria-label") || "").trim().slice(0, 40);
+          return `<${e.tagName.toLowerCase()}>${text ? ` "${text}"` : ""}`;
+        });
+        throw new Error(`No text field has focus to type into (focus is on ${what}). Wait for the field first, e.g. wait for "OTP Code", or tap it.`);
+      }
       await page.keyboard.type(v(step.text), { delay: 60 });
       return "";
+    }
     case "waitFor": {
       const t = v(step.target);
       const target = isCss(t)
@@ -189,9 +227,15 @@ export async function runStep(
     case "press":
       await page.keyboard.press(step.key);
       return "";
-    case "waitUrl":
-      await page.waitForURL((u) => u.href.includes(v(step.fragment)));
+    case "waitUrl": {
+      const want = v(step.fragment);
+      await page.waitForURL((u) => urlMatches(u, want));
+      // Single-page apps often show the URL for a moment, then redirect (e.g. to /login when signed out),
+      // so let the page settle and check again where it actually ended up.
+      await page.waitForLoadState("networkidle", { timeout: 3000 }).catch(() => {});
+      if (!urlMatches(new URL(page.url()), want)) throw new Error(`Ended up on ${page.url()}, not ${want}.`);
       return page.url();
+    }
     case "waitText":
       await page.getByText(v(step.text)).first().waitFor({ state: "visible" });
       return "";

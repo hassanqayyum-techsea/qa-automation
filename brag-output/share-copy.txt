@@ -1,0 +1,1 @@
+One sentence in, 13 passing steps out. In Repo Pulse's Tests tab you describe a test in plain English, pick a device and a login test to start signed in with, then watch it run live on an iPhone 15 browser, step by step. Every AI edit is saved as a version you can restore.

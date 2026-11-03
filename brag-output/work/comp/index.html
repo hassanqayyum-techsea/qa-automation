@@ -1,0 +1,310 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Repo Pulse Tests</title>
+<script src="timeline.js"></script>
+<style>
+@font-face { font-family: Geist; src: url(geist.woff2) format("woff2"); font-weight: 100 900; }
+:root { --navy: #10244f; --slate: #475467; --purple: #563bdb; --lav: #f4f3ff; --green: #067647; --greenbg: #ecfdf3; --line: #eaecf0; }
+* { box-sizing: border-box; margin: 0; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; background: #f7f7fb; }
+body { font-family: Geist, system-ui, sans-serif; color: var(--navy); -webkit-font-smoothing: antialiased; }
+#stage { position: absolute; inset: 0; overflow: hidden; }
+.abs { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform, opacity; }
+.blob { position: absolute; border-radius: 50%; filter: blur(90px); opacity: .55; }
+.kicker { font-size: 22px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--purple); }
+.h1 { font-size: 72px; font-weight: 650; letter-spacing: -0.03em; line-height: 1.05; }
+.h2 { font-size: 64px; font-weight: 650; letter-spacing: -0.03em; line-height: 1.05; }
+.sub { font-size: 30px; font-weight: 450; color: var(--slate); line-height: 1.3; letter-spacing: -0.01em; }
+.card { background: #fff; border-radius: 22px; box-shadow: 0 1px 2px rgba(16,24,40,.06), 0 24px 60px -12px rgba(52,40,140,.22); overflow: hidden; }
+.card img { display: block; }
+.win { background: #fff; border-radius: 18px; overflow: hidden; box-shadow: 0 1px 2px rgba(16,24,40,.06), 0 30px 80px -16px rgba(52,40,140,.28); }
+.win .bar { height: 36px; background: #f2f2f7; display: flex; align-items: center; gap: 8px; padding: 0 16px; border-bottom: 1px solid var(--line); }
+.win .bar i { width: 12px; height: 12px; border-radius: 50%; background: #d0d5dd; }
+.win .bar span { margin-left: 14px; font-size: 15px; color: #667085; }
+.win .view { position: relative; overflow: hidden; }
+.win .view img { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.pill { display: inline-flex; align-items: center; gap: 10px; padding: 12px 22px; border-radius: 999px; font-weight: 600; font-size: 28px; }
+.ok { background: var(--greenbg); color: var(--green); border: 1.5px solid #abefc6; }
+.run { background: var(--lav); color: var(--purple); border: 1.5px solid #d9d6fe; }
+.mono { font-family: "SF Mono", ui-monospace, Menlo, monospace; }
+.row { position: absolute; left: 0; width: 1000px; height: 50px; display: flex; align-items: center; gap: 16px; padding: 0 20px; border-radius: 12px; font-size: 19px; }
+.row .n { width: 26px; text-align: right; color: #98a2b3; font-size: 17px; }
+.row .from { font-family: Geist; font-size: 15px; font-weight: 600; color: var(--purple); background: var(--lav); border-radius: 8px; padding: 4px 10px; white-space: nowrap; }
+.row .t { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--navy); }
+.row .s { width: 170px; text-align: right; font-family: Geist; font-size: 18px; font-weight: 550; display: flex; justify-content: flex-end; align-items: center; gap: 8px; }
+.spin { width: 18px; height: 18px; border-radius: 50%; border: 2.5px solid #d9d6fe; border-top-color: var(--purple); }
+.cursor { position: absolute; left: 0; top: 0; width: 34px; height: 34px; filter: drop-shadow(0 3px 6px rgba(0,0,0,.25)); }
+.ripple { position: absolute; left: 0; top: 0; width: 80px; height: 80px; margin: -40px 0 0 -40px; border-radius: 50%; border: 3px solid var(--purple); }
+.ring { position: absolute; border-radius: 14px; border: 3px solid var(--purple); box-shadow: 0 0 0 6px rgba(86,59,219,.15); }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script>
+const S = TL.scenes;
+const $ = (html) => { const t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstChild; };
+const stage = document.getElementById("stage");
+const add = (html, parent = stage) => parent.appendChild($(html));
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const ease = (x) => 1 - Math.pow(1 - clamp(x), 3);
+const easeIO = (x) => { x = clamp(x); return x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
+const back = (x) => { x = clamp(x); const c = 1.6; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
+const lerp = (a, b, k) => a + (b - a) * k;
+const set = (el, { x = 0, y = 0, s = 1, o = 1 } = {}) => { el.style.transform = `translate(${x}px,${y}px) scale(${s})`; el.style.opacity = o; el.style.visibility = o <= 0.001 ? "hidden" : "visible"; };
+/** Scene envelope: 0→1 in over `fin`, 1→0 over the last `fout` seconds. */
+const env = (t, [a, b], fin = .45, fout = .32) => ({ i: ease((t - a) / fin), o: 1 - ease((t - (b - fout)) / fout), on: t >= a - .01 && t <= b + .01 });
+const vis = (e) => (e.on ? e.i * e.o : 0);
+
+// Background: slow drifting brand-coloured light.
+const blobs = [
+  add(`<div class="blob" style="width:900px;height:900px;background:#cfc8ff"></div>`),
+  add(`<div class="blob" style="width:700px;height:700px;background:#d7ecff"></div>`),
+  add(`<div class="blob" style="width:600px;height:600px;background:#efe3ff"></div>`),
+];
+
+// ---------- caption helper ----------
+function caption(kicker, head, sub, x = 120, y = 300, w = 600, cls = "h2") {
+  const el = add(`<div class="abs" style="width:${w}px">
+    ${kicker ? `<div class="kicker" style="margin-bottom:22px">${kicker}</div>` : ""}
+    <div class="${cls}">${head}</div>
+    ${sub ? `<div class="sub" style="margin-top:24px">${sub}</div>` : ""}</div>`);
+  return (t, range, delay = 0) => {
+    const e = env(t, range);
+    const k = ease((t - range[0] - delay) / .5);
+    set(el, { x, y: y + (1 - k) * 26, o: e.on ? k * e.o : 0 });
+  };
+}
+
+// ---------- window with a zoomable screenshot ----------
+function win(src, imgW, imgH, box) {
+  const el = add(`<div class="abs win" style="width:${box.w}px;height:${box.h}px"><div class="bar"><i></i><i></i><i></i><span>Repo Pulse</span></div><div class="view" style="width:${box.w}px;height:${box.h - 36}px"><img src="${src}" width="${imgW}" height="${imgH}"></div></div>`);
+  const img = el.querySelector("img");
+  const base = box.w / imgW;
+  const api = {
+    el, box,
+    view(zoom, cx, cy) {
+      const s = base * zoom, vw = box.w, vh = box.h - 36;
+      cx = clamp(cx, vw / 2 / s, imgW - vw / 2 / s); cy = clamp(cy, vh / 2 / s, imgH - vh / 2 / s);
+      api.s = s; api.cx = cx; api.cy = cy;
+      img.style.transform = `translate(${vw / 2 - cx * s}px,${vh / 2 - cy * s}px) scale(${s})`;
+    },
+    pt(px, py) { const vw = box.w, vh = box.h - 36; return [box.x + vw / 2 + (px - api.cx) * api.s, box.y + 36 + vh / 2 + (py - api.cy) * api.s]; },
+  };
+  return api;
+}
+
+// ---------- image card ----------
+function card(srcs, w, h, scale) {
+  const el = add(`<div class="abs card" style="width:${w * scale}px;height:${h * scale}px;background:#fff"></div>`);
+  const imgs = srcs.map((s) => { const i = add(`<img src="${s}" style="position:absolute;left:0;top:0;width:${w * scale}px">`, el); return i; });
+  return { el, imgs, show(i) { imgs.forEach((im, j) => (im.style.opacity = j === i ? 1 : 0)); } };
+}
+
+// ---------- cursor ----------
+const cursor = add(`<svg class="cursor abs" viewBox="0 0 24 24"><path d="M4 2.5l15.5 9.2-6.9 1.5 3.9 7.1-3 1.6-3.9-7.2L4.5 19z" fill="#10244f" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg>`);
+const ripple = add(`<div class="ripple abs"></div>`);
+/** Cursor path: list of [time, x, y]; clicks: list of times. */
+function drawCursor(t, path, clicks, range) {
+  const e = env(t, range, .3, .25);
+  if (!e.on || t < path[0][0] - .25) return false;
+  let x = path[0][1], y = path[0][2];
+  for (let i = 0; i < path.length - 1; i++) {
+    const [t0, x0, y0] = path[i], [t1, x1, y1] = path[i + 1];
+    if (t >= t0) { const k = easeIO((t - t0) / (t1 - t0)); x = lerp(x0, x1, k); y = lerp(y0, y1, k); }
+  }
+  const ap = clamp((t - (path[0][0] - .25)) / .25);
+  let press = 1;
+  for (const c of clicks) { const d = t - c; if (d > -.08 && d < .16) press = .82; }
+  set(cursor, { x: x - 6, y: y - 3, s: press, o: ap * e.o });
+  let rp = 0, rk = 0;
+  for (const c of clicks) { const d = t - c; if (d >= 0 && d < .5) { rk = d / .5; rp = 1 - rk; } }
+  set(ripple, { x, y, s: .3 + rk * .9, o: rp * .9 });
+  return true;
+}
+
+// ================= SCENES =================
+// 1 HOOK
+const hookK = add(`<div class="abs kicker">Repo Pulse · Tests</div>`);
+const hook1 = add(`<div class="abs h1" style="width:900px">Write a test in<br>plain English.</div>`);
+const hook2 = add(`<div class="abs h1" style="width:900px;color:var(--purple)">Watch it pass on<br>a real phone.</div>`);
+const hookPhone = add(`<img class="abs" src="img/phone-done.png" style="width:${680 * .649}px">`);
+const hookPill = add(`<div class="abs pill ok"><svg width="26" height="26" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#17b26a"/><path d="M7 12.5l3.2 3.2L17 9" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Passed · 13 of 13 steps</div>`);
+
+// 2 LIST
+const capList = caption("01 · The Tests tab", "Every app<br>under test.", "With its latest run,<br>at a glance.");
+const wList = win("img/apps.png", 2880, 1800, { x: 760, y: 215, w: 1040, h: 650 });
+// 3 APP
+const capApp = caption("02 · New test", "Open an app.<br>Add a test.", "Each one shows its steps,<br>device and last run.");
+const wApp = win("img/app.png", 2880, 1800, { x: 760, y: 215, w: 1040, h: 650 });
+const dim = add(`<div class="abs" style="width:1040px;height:614px;background:rgba(244,243,255,.72);border-radius:0 0 18px 18px"></div>`);
+const modal = add(`<img class="abs" src="img/modal.png" style="width:${1220 * .56}px;border-radius:16px;box-shadow:0 30px 70px -10px rgba(52,40,140,.35)">`);
+// 4 DEVICE
+const capDev = caption("03 · Device", "Pick the<br>device.", "Phone, tablet, desktop,<br>or any custom size.");
+const DS = .88;
+const cDev = card(["img/dev-phone.png", "img/dev-tablet.png", "img/dev-desktop.png", "img/dev-custom.png"], 1058, 768, DS);
+// 5 SESSION
+const capSes = caption("04 · Session", "Start<br>signed in.", "Your login test runs first,<br>in the same browser.");
+const cSes = card(["img/dev-phone.png", "img/session-open.png", "img/dev-session.png"], 1058, 786, DS);
+const ring = add(`<div class="ring abs" style="width:${992 * DS}px;height:${80 * DS}px"></div>`);
+// 6 AI
+const capAi1 = caption("05 · AI", "Describe it.", "AI writes the steps<br>from one sentence.");
+const capAi2 = caption("05 · AI", "4 steps.<br>No sign-in.", "The session handles<br>the login.");
+const TYPE_N = 28;
+const cType = card([...Array(TYPE_N)].map((_, i) => `img/type-${String(i).padStart(3, "0")}.png`).concat(["img/generating.png"]), 1058, 508, DS);
+const cEditor = card(["img/editor.png"], 1058, 420, .95);
+const cPreview = card(["img/preview.png"], 1058, 356, .95);
+const tagW = add(`<div class="abs pill run" style="font-size:22px;padding:8px 18px">Write</div>`);
+const tagP = add(`<div class="abs pill run" style="font-size:22px;padding:8px 18px">Preview</div>`);
+// 7 RUN
+const runPhoneWrap = add(`<div class="abs" style="width:${680 * .649}px;height:${1325 * .649}px"></div>`);
+const runImgs = [...Array(TL.run.frames)].map((_, i) => add(`<img src="img/phone-${String(i).padStart(3, "0")}.png" style="position:absolute;left:0;top:0;width:100%;opacity:0">`, runPhoneWrap));
+runImgs.push(add(`<img src="img/phone-done.png" style="position:absolute;left:0;top:0;width:100%;opacity:0">`, runPhoneWrap));
+const runHead = add(`<div class="abs" style="width:1000px"><div class="kicker">06 · Live run · iPhone 15</div><div class="h2" style="font-size:58px;margin-top:16px">Watch every step live.</div></div>`);
+const runStatus = add(`<div class="abs" style="display:flex;align-items:center;gap:18px;font-size:26px;font-weight:550;color:var(--slate)"><span class="pill run" id="badge" style="font-size:22px;padding:8px 18px">Running</span><span id="count">0 of 13 steps passed</span><span class="pill ok" id="links" style="font-size:22px;padding:8px 18px;opacity:0">links = 18</span></div>`);
+const badge = runStatus.querySelector("#badge"), count = runStatus.querySelector("#count"), linksPill = runStatus.querySelector("#links");
+const runList = add(`<div class="abs" style="width:1000px;height:670px"></div>`);
+const rows = TL.run.steps.map(([from, text], i) => add(`<div class="row mono" style="top:${i * 51}px"><span class="n">${i + 1}</span>${from ? `<span class="from">${from}</span>` : ""}<span class="t">${text.replace(/</g, "&lt;")}</span><span class="s"></span></div>`, runList));
+const ends = []; { let acc = TL.run.start; for (const s of TL.run.steps) { acc += s[2] / 1000; ends.push(acc); } }
+// 8 VERSIONS
+const capVer = caption("07 · Versions", "Every AI edit<br>is a version.", "Restore any one<br>in a click.", 120, 300, 640);
+const VS = .5;
+const cVer = card(["img/versions.png"], 2180, 654, VS);
+// 9 OUTRO
+const outro = add(`<div class="abs" style="width:1920px;text-align:center">
+  <div style="display:inline-flex;align-items:center;gap:22px"><span style="width:84px;height:84px;border-radius:20px;background:var(--purple);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:38px;font-weight:600">RP</span><span style="font-size:54px;font-weight:600;letter-spacing:-.02em">Repo Pulse</span></div>
+  <div class="h1" style="font-size:120px;margin-top:34px">Tests</div>
+  <div class="sub" style="font-size:36px;margin-top:30px">Markdown steps. Real devices. Live runs.</div></div>`);
+
+const runR = (u) => { const w = TL.run.warp; if (u <= w[0][0]) return 0; for (let i = 0; i < w.length - 1; i++) if (u <= w[i + 1][0]) return lerp(w[i][1], w[i + 1][1], (u - w[i][0]) / (w[i + 1][0] - w[i][0])); return w.at(-1)[1]; };
+
+window.seek = function (t) {
+  // background drift
+  blobs.forEach((b, i) => { const a = t * .18 + i * 2.1; set(b, { x: [-200, 1200, 500][i] + Math.cos(a) * 120, y: [-250, 400, 650][i] + Math.sin(a * 1.3) * 80, o: .55 }); });
+  set(cursor, { o: 0 }); set(ripple, { o: 0 }); set(ring, { o: 0 });
+
+  // 1 HOOK
+  { const e = env(t, S.hook, .5, .35), o = e.on ? e.o : 0;
+    set(hookK, { x: 120, y: 230 + (1 - ease(t / .5)) * 20, o: ease(t / .5) * o });
+    const k1 = ease((t - .15) / .6), k2 = ease((t - .75) / .6);
+    set(hook1, { x: 120, y: 300 + (1 - k1) * 40, o: k1 * o });
+    set(hook2, { x: 120, y: 500 + (1 - k2) * 40, o: k2 * o });
+    const kp = ease((t - .3) / .9);
+    set(hookPhone, { x: 1240, y: 110 + (1 - kp) * 120, o: kp * o });
+    const kb = back((t - 1.35) / .45);
+    set(hookPill, { x: 1110, y: 900, s: .6 + .4 * kb, o: clamp((t - 1.35) / .2) * o }); }
+
+  // 2 LIST
+  { const e = env(t, S.list), v = vis(e), [a] = S.list, k = easeIO((t - a) / 3.4);
+    capList(t, S.list, .1);
+    wList.view(lerp(1, 1.3, k), lerp(1440, 1120, k), lerp(900, 700, k));
+    set(wList.el, { x: 760, y: 215 + (1 - e.i) * 30, o: v });
+    const [nx, ny] = wList.pt(150, 452);
+    drawCursor(t, [[4.3, 1500, 900], [5.05, nx + 4, ny + 4], [7, nx + 4, ny + 4]], [TL.clicks[0]], S.list); }
+
+  // 3 APP
+  { const e = env(t, S.app), v = vis(e), [a] = S.app, k = easeIO((t - a) / 1.4);
+    capApp(t, S.app, .1);
+    wApp.view(lerp(1.0, 1.1, k), lerp(1440, 1500, k), lerp(900, 773, k));
+    set(wApp.el, { x: 760, y: 215 + (1 - e.i) * 30, o: v });
+    const [bx, by] = wApp.pt(2630, 301);
+    drawCursor(t, [[7.45, 1150, 700], [8.45, bx, by + 4], [10, bx, by + 4]], [TL.clicks[1]], S.app);
+    const km = back((t - 8.7) / .4), kd = ease((t - 8.68) / .25);
+    set(dim, { x: 760, y: 251, o: kd * v });
+    const mw = 1220 * .56, mh = 540 * .56;
+    set(modal, { x: 760 + (1040 - mw * (.85 + .15 * km)) / 2, y: 251 + (614 - mh * (.85 + .15 * km)) / 2, s: .85 + .15 * km, o: clamp((t - 8.7) / .15) * v }); }
+
+  // 4 DEVICE
+  { const e = env(t, S.device), v = vis(e);
+    capDev(t, S.device, .1);
+    const idx = t < TL.clicks[2] + .06 ? 0 : t < TL.clicks[3] + .06 ? 1 : t < TL.clicks[4] + .06 ? 2 : 3;
+    cDev.show(idx);
+    cDev.el.style.height = `${(idx === 3 ? 768 : 576) * DS}px`;
+    const X = 840, Y = 230;
+    set(cDev.el, { x: X, y: Y + (1 - e.i) * 30, o: v });
+    const p = (px, py) => [X + px * DS, Y + py * DS];
+    const [tx, ty] = p(284, 126), [dx, dy] = p(438, 126), [cx, cy] = p(633, 126);
+    drawCursor(t, [[10.35, 1500, 760], [10.85, tx, ty], [11.45, tx, ty], [11.85, dx, dy], [12.45, dx, dy], [12.85, cx, cy], [14.8, cx, cy]], TL.clicks.slice(2, 5), S.device); }
+
+  // 5 SESSION
+  { const e = env(t, S.session), v = vis(e);
+    capSes(t, S.session, .1);
+    const idx = t < TL.clicks[5] + .06 ? 0 : t < TL.clicks[6] + .06 ? 1 : 2;
+    cSes.show(idx);
+    cSes.el.style.height = `${(idx === 1 ? 786 : 576) * DS}px`;
+    const X = 840, Y = 230;
+    set(cSes.el, { x: X, y: Y + (1 - e.i) * 30, o: v });
+    const p = (px, py) => [X + px * DS, Y + py * DS];
+    const [sx, sy] = p(560, 449), [ox, oy] = p(240, 714);
+    drawCursor(t, [[14.95, 1500, 860], [15.25, sx, sy], [15.85, sx, sy], [16.35, ox, oy], [16.8, ox, oy], [17.2, 1560, 900]], TL.clicks.slice(5, 7), S.session);
+    const kr = ease((t - 16.55) / .35);
+    set(ring, { x: X + 33 * DS - 3, y: Y + 409 * DS - 3, o: idx === 2 ? kr * v * (1 - ease((t - 17.5) / .3)) : 0 }); }
+
+  // 6 AI
+  { const e = env(t, S.ai), v = vis(e);
+    const A = [S.ai[0], 21.8], B = [21.8, S.ai[1]];
+    capAi1(t, A, .1); capAi2(t, B, .1);
+    const [t0, t1] = TL.typing;
+    const fi = t < t0 ? 0 : t < t1 ? Math.min(TYPE_N - 1, Math.floor(((t - t0) / (t1 - t0)) * TYPE_N)) : t < TL.clicks[7] + .12 ? TYPE_N - 1 : TYPE_N;
+    cType.show(fi);
+    const ea = env(t, A, .45, .3), va = vis(ea);
+    const X = 840, Y = 300;
+    set(cType.el, { x: X, y: Y + (1 - ea.i) * 30, o: va });
+    const [bx, by] = [X + 841 * DS, Y + 433 * DS];
+    drawCursor(t, [[19.6, 1560, 900], [20.6, bx, by], [21.5, bx, by]], [TL.clicks[7]], A);
+    const eb = env(t, B, .5, .32), vb = vis(eb), kp = ease((t - 23.0) / .5);
+    set(cEditor.el, { x: 760 + kp * -20, y: 190 + (1 - eb.i) * 30, o: vb * (1 - .3 * kp) });
+    set(tagW, { x: 770, y: 140 + (1 - eb.i) * 30, o: vb });
+    set(cPreview.el, { x: 840, y: 640 + (1 - kp) * 40, o: kp * vb });
+    set(tagP, { x: 850, y: 590 + (1 - kp) * 40, o: kp * vb }); }
+
+  // 7 RUN
+  { const e = env(t, S.run, .5, .35), v = vis(e), u = t - S.run[0], r = runR(u);
+    set(runPhoneWrap, { x: 250, y: 110 + (1 - e.i) * 40, o: v });
+    const done = u >= TL.run.warp.at(-1)[0];
+    const fi = done ? TL.run.frames : clamp(Math.round(r / TL.run.frameDt), 0, TL.run.frames - 1);
+    runImgs.forEach((im, i) => (im.style.opacity = i === fi ? 1 : 0));
+    set(runHead, { x: 800, y: 100 + (1 - e.i) * 26, o: v });
+    set(runStatus, { x: 800, y: 262 + (1 - ease((u - .15) / .5)) * 20, o: v * ease((u - .15) / .5) });
+    set(runList, { x: 790, y: 335, o: v });
+    let passed = 0;
+    rows.forEach((row, i) => {
+      const k = ease((u - .2 - i * .05) / .4);
+      row.style.transform = `translateY(${(1 - k) * 16}px)`; row.style.opacity = k;
+      const st = row.querySelector(".s");
+      const isDone = r >= ends[i], running = !isDone && r >= (i ? ends[i - 1] : TL.run.start);
+      if (isDone) passed++;
+      const flash = isDone ? clamp(1 - (r - ends[i]) / .35) : 0;
+      row.style.background = running ? "rgba(244,243,255,.95)" : flash > 0 ? `rgba(236,253,243,${.4 + .6 * flash})` : "rgba(255,255,255,.7)";
+      const html = isDone ? `<svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#17b26a"/><path d="M7 12.5l3.2 3.2L17 9" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span style="color:var(--green)">Passed · ${(TL.run.steps[i][2] / 1000).toFixed(1)}s</span>`
+        : running ? `<span class="spin" style="transform:rotate(${(t * 360 * 1.4) % 360}deg)"></span><span style="color:var(--purple)">Running</span>` : `<span style="color:#98a2b3">Waiting</span>`;
+      if (st.dataset.h !== html) { st.innerHTML = html; st.dataset.h = html; }
+    });
+    count.textContent = `${passed} of 13 steps passed`;
+    const all = passed === 13;
+    badge.textContent = all ? "Passed" : "Running"; badge.className = `pill ${all ? "ok" : "run"}`;
+    linksPill.style.opacity = all ? ease((t - TL.success) / .35) : 0; }
+
+  // 8 VERSIONS
+  { const e = env(t, S.versions), v = vis(e);
+    capVer(t, S.versions, .1);
+    const X = 780, Y = 380;
+    set(cVer.el, { x: X, y: Y + (1 - e.i) * 30, o: v });
+    const [rx, ry] = [X + 2050 * VS, Y + 578 * VS];
+    drawCursor(t, [[34.6, 1500, 900], [35.9, rx, ry + 4], [37, rx, ry + 4]], TL.hover, S.versions); }
+
+  // 9 OUTRO
+  { const [a, b] = S.outro, k = ease((t - a) / .7), o = t >= a - .01 ? k * (1 - ease((t - (b - .2)) / .2) * 0) : 0;
+    set(outro, { x: 0, y: 330 + (1 - k) * 34, o }); }
+};
+
+window.ready = (async () => {
+  await document.fonts.ready;
+  await Promise.all([...document.images].map((i) => i.decode().catch(() => console.error("img", i.src))));
+  window.seek(0);
+  return true;
+})();
+</script>
+</body>
+</html>

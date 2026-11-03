@@ -115,7 +115,10 @@ export async function runTest(runId: string) {
       await col.runs.updateOne({ _id }, { $set: { [`steps.${i}`]: steps[i] } });
       await send({ t: "step", i, step: { ...steps[i], screenshot: undefined } });
       if (failed) {
-        for (let j = i + 1; j < steps.length; j++) steps[j].status = "skipped";
+        for (let j = i + 1; j < steps.length; j++) {
+          steps[j].status = "skipped";
+          await send({ t: "step", i: j, step: steps[j] }); // so the live table shows Skipped, not Waiting
+        }
         await col.runs.updateOne({ _id }, { $set: { steps } });
         return await finish("failed", `Step ${i + 1} failed: ${failed}`, values);
       }

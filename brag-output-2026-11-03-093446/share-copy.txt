@@ -1,0 +1,3 @@
+The Tests tab in Repo Pulse, start to finish, recorded in the real app.
+
+Name a test, then describe it in one English sentence and the AI writes the Markdown steps. Pick any phone, tablet, desktop or custom size, and start signed in by reusing a login test as the session. Press Run and watch a real iPhone 15 browser on the server sign in, enter the OTP and pass 13 of 13 steps live. Every AI edit is saved as a version you can restore, and every run keeps a screenshot of each step.

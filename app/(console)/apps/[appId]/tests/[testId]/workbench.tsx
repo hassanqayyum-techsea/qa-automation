@@ -18,7 +18,7 @@ import { RunSetup } from "./run-setup";
 import { TestPreview } from "./test-preview";
 import type { StepResult } from "~/lib/db";
 import { generateSteps, saveTest, startRun, stopRun, type TestDraft } from "../../../actions";
-import { RUN, RunBadge, type RunState } from "../../../app-ui";
+import { RUN, RunBadge, StepBadge, type RunState } from "../../../app-ui";
 
 type Version = TestDraft & { id: string; at: string; by: string; source: "saved" | "draft" | "ai"; prompt: string | null; sessionName: string | null };
 type History = { id: string; status: RunState; by: string; createdAt: string; ms: number | null; passed: number; total: number };
@@ -28,7 +28,6 @@ type LiveMsg =
   | { t: "step"; i: number; step: StepResult }
   | { t: "status"; status: RunState; error?: string; values?: Record<string, number> };
 
-const STEP_MARK: Record<StepResult["status"], string> = { pending: "Waiting", running: "Running", passed: "Passed", failed: "Failed", skipped: "Skipped" };
 const isLive = (s: RunState | null) => s === "queued" || s === "running";
 const sameDraft = (a: TestDraft, b: TestDraft) => a.markdown === b.markdown && a.device === b.device && a.sessionTestId === b.sessionTestId;
 const SOURCE = { saved: "Saved", draft: "Before AI edit", ai: "AI edit" } as const;
@@ -107,6 +106,7 @@ export function Workbench({
         setSteps(m.steps);
         setValues(m.values);
         setError(m.error);
+        if (!isLive(m.status)) es.close(); // already finished; the server ends the stream, so don't reconnect
       } else if (m.t === "step") {
         setSteps((prev) => prev.map((s, i) => (i === m.i ? m.step : s)));
         if (m.step.status !== "running") setAnnouncement(`Step ${m.i + 1} ${m.step.status}: ${m.step.text}`);
@@ -318,8 +318,10 @@ export function Workbench({
                           </span>
                         </Table.Cell>
                         <Table.Cell>
-                          {STEP_MARK[s.status]}
-                          {s.ms !== undefined && <span className="text-sm text-tertiary">{` · ${(s.ms / 1000).toFixed(1)}s`}</span>}
+                          <span className="flex flex-wrap items-center gap-2">
+                            <StepBadge status={s.status} />
+                            {s.ms !== undefined && <span className="text-sm text-tertiary">{`${(s.ms / 1000).toFixed(1)}s`}</span>}
+                          </span>
                         </Table.Cell>
                       </Table.Row>
                     )}

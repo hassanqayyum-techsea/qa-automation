@@ -5,7 +5,16 @@ import { subscribe } from "./redis";
  * `snapshot` (optional) is read after the subscription is live and sent first; messages that
  * arrive meanwhile are held and sent right after it, so the client never misses an update.
  */
-export function sseFromChannel(req: Request, channel: string, snapshot?: () => Promise<unknown>): Response {
+export function sseFromChannel(
+  req: Request,
+  channel: string,
+  snapshot?: () => Promise<unknown>,
+  /**
+   * Ends the stream after the message it returns true for. Proxies and tunnels (e.g. Cloudflare) can hold
+   * the last small chunks of an open stream; closing it flushes them, so the final status always arrives.
+   */
+  isLast?: (raw: string) => boolean,
+): Response {
   const enc = new TextEncoder();
   let cleanup = () => {};
   const stream = new ReadableStream<Uint8Array>({
@@ -20,22 +29,30 @@ export function sseFromChannel(req: Request, channel: string, snapshot?: () => P
       send(": connected\n\n");
       const held: string[] = [];
       let live = false;
-      const sub = subscribe(channel, (msg) => (live ? send(`data: ${msg}\n\n`) : held.push(msg)));
+      let ended = false;
+      const end = () => {
+        ended = true;
+        cleanup();
+        try {
+          controller.close();
+        } catch {}
+      };
+      const emit = (msg: string) => {
+        if (ended) return;
+        send(`data: ${msg}\n\n`);
+        if (isLast?.(msg)) end();
+      };
+      const sub = subscribe(channel, (msg) => (live ? emit(msg) : held.push(msg)));
       const ping = setInterval(() => send(": ping\n\n"), 25_000); // keeps proxies from closing idle streams
       cleanup = () => {
         clearInterval(ping);
         sub.close();
         cleanup = () => {};
       };
-      req.signal.addEventListener("abort", () => {
-        cleanup();
-        try {
-          controller.close();
-        } catch {}
-      });
+      req.signal.addEventListener("abort", end);
       await sub.ready;
-      if (snapshot) send(`data: ${JSON.stringify(await snapshot())}\n\n`);
-      for (const msg of held) send(`data: ${msg}\n\n`);
+      if (snapshot) emit(JSON.stringify(await snapshot()));
+      for (const msg of held) emit(msg);
       live = true;
     },
     cancel() {
@@ -43,6 +60,11 @@ export function sseFromChannel(req: Request, channel: string, snapshot?: () => P
     },
   });
   return new Response(stream, {
-    headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive" },
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no", // nginx-style proxies: don't buffer the stream
+    },
   });
 }

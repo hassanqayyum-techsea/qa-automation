@@ -7,8 +7,7 @@ import { Body2 } from "@your-job-search-genius/odyssey-ui/components/base/typogr
 import type { StepResult } from "~/lib/db";
 import type { FrameShape } from "~/lib/testdsl";
 import { DeviceScreen } from "../../apps/device-screen";
-
-const MARK = { pending: "Not run", running: "Interrupted", passed: "Passed", failed: "Failed", skipped: "Skipped" } as const;
+import { StepBadge } from "../../apps/app-ui";
 
 // Client component because compound parts like DescriptionList.Item aren't reachable from Server Components.
 export function RunView({
@@ -45,7 +44,12 @@ export function RunView({
             <article key={i} className="flex min-w-0 flex-col gap-3" aria-labelledby={`step-${i}`}>
               <div className="flex flex-col gap-1">
                 <Heading level={3} size={6} id={`step-${i}`} className="font-mono wrap-anywhere">{`${i + 1}. ${s.text}`}</Heading>
-                <Body2>{`${MARK[s.status]}${s.ms !== undefined ? ` in ${(s.ms / 1000).toFixed(1)}s` : ""}${s.note ? ` · ${s.note}` : ""}`}</Body2>
+                <span className="flex flex-wrap items-center gap-2">
+                  <StepBadge status={s.status} final />
+                  {(s.ms !== undefined || s.note) && (
+                    <Body2 className="wrap-anywhere">{[s.ms !== undefined ? `${(s.ms / 1000).toFixed(1)}s` : "", s.note ?? ""].filter(Boolean).join(" · ")}</Body2>
+                  )}
+                </span>
               </div>
               {s.screenshot ? (
                 <DeviceScreen jpeg={s.screenshot} shape={shape} size="sm" label={`Screen after step ${i + 1}`} />

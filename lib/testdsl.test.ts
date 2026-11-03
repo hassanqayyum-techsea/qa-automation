@@ -1,7 +1,7 @@
 // Run: node --test lib/testdsl.test.ts
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { customSize, fillVars, frameShape, parseTest, resolveDevice, splitHeader } from "./testdsl.ts";
+import { customSize, fillVars, frameShape, isCss, parseTest, resolveDevice, splitHeader, urlMatches } from "./testdsl.ts";
 
 test("parses every step form and ignores prose, header lines and code fences", () => {
   const r = parseTest(`# Login and count jobs
@@ -75,4 +75,20 @@ test("devices: known names, shorthands and custom sizes", () => {
 test("splitHeader moves device and session lines out of the Markdown", () => {
   assert.deepEqual(splitHeader("# T\ndevice: iPhone 15\nsession: Login\n- go to /"), { body: "# T\n- go to /", device: "iPhone 15", session: "Login" });
   assert.deepEqual(splitHeader("- go to /"), { body: "- go to /", device: null, session: null });
+  assert.equal(splitHeader('session: "Login Test"').session, "Login Test");
+});
+
+test("isCss tells selectors from labels", () => {
+  for (const s of ["#email", ".btn", "[name=q]", "input[name='email']", "button.primary", "div#app", "text-field[type=x]"]) assert.ok(isCss(s), s);
+  for (const s of ["Email address", "Email Address*", "Sign in", "Password", "OTP Code", "Email:"]) assert.ok(!isCss(s), s);
+});
+
+test("wait for url matches the path, not a redirect's query", () => {
+  const u = (s: string) => new URL(s);
+  assert.ok(urlMatches(u("https://a.com/dashboard"), "/dashboard"));
+  assert.ok(urlMatches(u("https://a.com/admin/institution/dashboard"), "/dashboard"));
+  assert.ok(!urlMatches(u("https://a.com/login?next=%2Fdashboard&tab=student"), "/dashboard"));
+  assert.ok(!urlMatches(u("https://a.com/login?next=/dashboard"), "/dashboard"));
+  assert.ok(urlMatches(u("https://a.com/jobs?tab=saved"), "/jobs?tab=saved"));
+  assert.ok(urlMatches(u("https://app.a.com/x"), "app.a.com"));
 });
