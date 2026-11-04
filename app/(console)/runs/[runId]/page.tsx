@@ -25,7 +25,7 @@ export default async function RunPage({ params }: PageProps<"/runs/[runId]">) {
           { id: "run", label: "Run" },
         ]}
       />
-      <title>{`Run of ${run.testName} · Repo Pulse`}</title>
+      <title>{`Run of ${run.testName} · QA Automation`}</title>
       <PageHeader
         title={`Run of “${run.testName}”`}
         description={

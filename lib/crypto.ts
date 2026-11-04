@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, createHmac, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
+import { createCipheriv, createDecipheriv, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { env } from "./env";
 
@@ -31,13 +31,3 @@ export async function verifyPassword(pw: string, stored: string): Promise<boolea
   const test = await scryptAsync(pw, salt, 64);
   return timingSafeEqual(test, hash);
 }
-
-/** GitHub's X-Hub-Signature-256 check, constant-time. */
-export function verifyGithubSignature(secret: string, body: string, header: string | null): boolean {
-  if (!header?.startsWith("sha256=")) return false;
-  const expected = Buffer.from("sha256=" + createHmac("sha256", secret).update(body).digest("hex"));
-  const got = Buffer.from(header);
-  return got.length === expected.length && timingSafeEqual(got, expected);
-}
-
-export const randomSecret = () => randomBytes(32).toString("hex");

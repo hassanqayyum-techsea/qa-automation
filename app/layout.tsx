@@ -7,8 +7,8 @@ import "./globals.css";
 const geist = Geist({ variable: "--font-geist", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: { default: "Repo Pulse", template: "%s · Repo Pulse" },
-  description: "Read-only GitHub analytics and live browser tests",
+  title: { default: "QA Automation", template: "%s · QA Automation" },
+  description: "Create, run, and review live browser tests",
 };
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover" };

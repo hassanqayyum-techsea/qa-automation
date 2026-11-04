@@ -19,83 +19,6 @@ export interface Role {
   permissions: Permission[];
   builtIn: boolean;
 }
-export interface Org {
-  _id: ObjectId;
-  ghId: number;
-  login: string;
-  token: string; // encrypted
-  tokenScopes: string[] | null; // classic tokens report scopes; fine-grained tokens report none
-  webhookSecret: string; // encrypted
-  enabled: boolean;
-  hidden: boolean;
-  lastSyncAt?: Date;
-  syncError?: string | null;
-  createdAt: Date;
-}
-export interface Repo {
-  _id: ObjectId;
-  ghId: number;
-  orgId: ObjectId;
-  name: string;
-  fullName: string;
-  isPrivate: boolean;
-  isArchived: boolean;
-  defaultBranch: string | null;
-  enabled: boolean;
-  hidden: boolean;
-  lastCommitAt?: Date; // newest commit we have; next sync asks GitHub for commits since this
-  lastPrUpdatedAt?: Date;
-  lastSyncAt?: Date;
-  syncError?: string | null;
-}
-/** _id is "gh:<accountId>" when GitHub knows the author, else "email:<address>". */
-export interface Contributor {
-  _id: string;
-  login?: string;
-  name?: string;
-  avatarUrl?: string;
-  emails: string[];
-}
-export interface Commit {
-  _id: ObjectId;
-  repoId: ObjectId;
-  sha: string;
-  contributorId: string;
-  committedAt: Date;
-  additions: number;
-  deletions: number;
-  isMerge: boolean; // excluded from line totals so a change isn't counted twice
-  message: string;
-  url: string;
-}
-export interface PullRequest {
-  _id: ObjectId;
-  repoId: ObjectId;
-  number: number;
-  title: string;
-  contributorId: string;
-  state: "OPEN" | "CLOSED" | "MERGED";
-  createdAt: Date;
-  updatedAt: Date;
-  mergedAt: Date | null;
-  additions: number;
-  deletions: number;
-  commitCount: number;
-  url: string;
-}
-export interface HookEvent {
-  _id: ObjectId;
-  deliveryId: string;
-  type: string;
-  action?: string;
-  orgId: ObjectId;
-  repoId?: ObjectId;
-  summary: string;
-  status: "queued" | "done" | "failed";
-  error?: string;
-  receivedAt: Date;
-  processedAt?: Date;
-}
 export interface AuditEntry {
   _id: ObjectId;
   actorId: ObjectId;
@@ -169,12 +92,6 @@ const db = client.db();
 export const col = {
   users: db.collection<User>("users"),
   roles: db.collection<Role>("roles"),
-  orgs: db.collection<Org>("orgs"),
-  repos: db.collection<Repo>("repos"),
-  contributors: db.collection<Contributor>("contributors"),
-  commits: db.collection<Commit>("commits"),
-  pulls: db.collection<PullRequest>("pullRequests"),
-  hookEvents: db.collection<HookEvent>("hookEvents"),
   audit: db.collection<AuditEntry>("auditLog"),
   apps: db.collection<App>("apps"),
   tests: db.collection<Test>("tests"),
@@ -188,18 +105,6 @@ export function dbReady(): Promise<void> {
     await Promise.all([
       col.users.createIndex({ email: 1 }, { unique: true }),
       col.roles.createIndex({ name: 1 }, { unique: true }),
-      col.orgs.createIndex({ ghId: 1 }, { unique: true }),
-      col.repos.createIndex({ ghId: 1 }, { unique: true }),
-      col.repos.createIndex({ orgId: 1 }),
-      col.contributors.createIndex({ emails: 1 }),
-      col.commits.createIndex({ repoId: 1, sha: 1 }, { unique: true }),
-      col.commits.createIndex({ repoId: 1, committedAt: -1 }),
-      col.commits.createIndex({ contributorId: 1, committedAt: -1 }),
-      col.pulls.createIndex({ repoId: 1, number: 1 }, { unique: true }),
-      col.pulls.createIndex({ contributorId: 1, createdAt: -1 }),
-      col.pulls.createIndex({ repoId: 1, createdAt: -1 }),
-      col.hookEvents.createIndex({ deliveryId: 1 }, { unique: true }),
-      col.hookEvents.createIndex({ receivedAt: 1 }, { expireAfterSeconds: 90 * 24 * 3600 }),
       col.audit.createIndex({ at: -1 }),
       col.tests.createIndex({ appId: 1 }),
       col.runs.createIndex({ testId: 1, createdAt: -1 }),

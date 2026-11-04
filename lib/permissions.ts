@@ -2,12 +2,6 @@
 // Hiding UI is never authorization: every server action and query re-checks via requirePermission().
 
 export const PERMISSIONS = {
-  "analytics:view": "See dashboards, contributors and the leaderboard for visible repos",
-  "hidden:view": "See hidden orgs and repos and include them in totals",
-  "scope:manage": "Enable, disable or hide orgs and repos",
-  "sync:run": "Start a sync and see sync errors",
-  "hooks:view": "See webhook events and webhook secrets",
-  "token:manage": "Add, replace or remove GitHub tokens",
   "users:manage": "Create users, reset passwords, assign roles",
   "roles:manage": "Create and edit roles",
   "audit:view": "Read the audit log",
@@ -25,7 +19,7 @@ export const BUILT_IN_ROLES: { name: string; permissions: Permission[] }[] = [
   { name: "Owner", permissions: ALL_PERMISSIONS },
   {
     name: "Admin",
-    permissions: ALL_PERMISSIONS.filter((p) => !["token:manage", "users:manage", "roles:manage"].includes(p)),
+    permissions: ALL_PERMISSIONS.filter((p) => !["users:manage", "roles:manage"].includes(p)),
   },
-  { name: "Viewer", permissions: ["analytics:view", "tests:view"] },
+  { name: "Viewer", permissions: ["tests:view"] },
 ];

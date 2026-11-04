@@ -35,7 +35,7 @@ export async function login(_prev: ActionResult, fd: FormData): Promise<ActionRe
   }
   await redis.del(attemptsKey);
   await createSession(user._id.toString());
-  redirect("/");
+  redirect("/apps");
 }
 
 const ownerSchema = z.object({
@@ -65,7 +65,7 @@ export async function createOwner(_prev: ActionResult, fd: FormData): Promise<Ac
     createdAt: new Date(),
   });
   await createSession(_id.toString());
-  redirect("/");
+  redirect("/apps");
 }
 
 export async function logout() {
