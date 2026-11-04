@@ -175,7 +175,7 @@ export async function runStep(
     if (isCss(t)) return page.locator(t).first();
     const label = page.locator("label", { hasText: t }).first();
     let loc = page.getByLabel(t).or(page.getByPlaceholder(t));
-    const forId = await label.getAttribute("for", { timeout: 2000 }).catch(() => null);
+    const forId = await label.getAttribute("for", { timeout: 500 }).catch(() => null);
     if (forId) loc = loc.or(page.locator(`[id="${forId.replace(/"/g, '\\"')}"]`));
     loc = loc.or(label.locator("xpath=following::*[self::input or self::textarea or self::select][not(@type='hidden')][1]"));
     return loc.first();

@@ -7,7 +7,12 @@ import { contextFor } from "./devices";
 import { planRun, stepLabel } from "./plan";
 import { isBlockedHost } from "./net";
 
-const STEP_TIMEOUT_MS = 15_000;
+// Each action (click, fill, wait for text, ...) gets 2s to find its target. Page loads (go to, wait for url)
+// keep longer, since a cold page often takes more than 2s. After every step that passes the run pauses
+// for a hidden second so the app can react (redirects, spinners, focus moves) before the next one.
+const STEP_TIMEOUT_MS = 2_000;
+const PAGE_LOAD_TIMEOUT_MS = 15_000;
+const STEP_SETTLE_MS = 1_000;
 
 
 /** Messages on run:<id>. The browser's live panel renders exactly these. */
@@ -70,6 +75,7 @@ export async function runTest(runId: string) {
   try {
     const context = await browser.newContext(profile);
     context.setDefaultTimeout(STEP_TIMEOUT_MS);
+    context.setDefaultNavigationTimeout(PAGE_LOAD_TIMEOUT_MS);
     const appHost = new URL(app.baseUrl).hostname;
     await context.route("**/*", (route) => {
       let host = "";
@@ -107,6 +113,7 @@ export async function runTest(runId: string) {
         steps[i].note = failed;
       }
       steps[i].ms = Date.now() - started;
+      if (!failed && !stopped) await page.waitForTimeout(STEP_SETTLE_MS).catch(() => {}); // not counted in the step's time
       if (stopped) return await stopAt(i);
       steps[i].screenshot = await page
         .screenshot({ type: "jpeg", quality: 55, scale: "css" })
